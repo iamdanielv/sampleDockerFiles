@@ -1,8 +1,8 @@
 ARG BUILDER_IMAGE=golang:alpine
 
-###
-# BUILD
-###
+#####################
+# BUILD environment #
+#####################
 FROM ${BUILDER_IMAGE} as builder
 
 RUN apk update && apk add --no-cache git ca-certificates tzdata && update-ca-certificates
@@ -38,23 +38,28 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags='-w -s -extldflags "-static"' -a \
     -o myApp .
 
-###
-# Copy executable to scratch image
-# Note: If your app needs anything other than what is built
-# into your executable, you will need to add them here.
-###
-
+###########################################
+# Create a new Image that will become our #
+# RUN environment                         #
+###########################################
 FROM scratch
 
+###
+# Copy our static executable from
+# the build image to this image
+###
+COPY --from=builder /src/myApp .
+
+###
+# Note: If your app needs anything other than what is built
+# into your executable, you will need to add it here.
+###
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 
-# Copy our static executable
-COPY --from=builder /src/myApp .
-
-# You need to copy any config files required at run time into the same directory
+# EXAMPLE: You need to copy any config files required at run time into the same directory
 # COPY --from=builder /src/sample.yaml .
 
 # Use an unprivileged user
